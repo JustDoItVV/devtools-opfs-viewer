@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>OPFS Viewer — test fixture</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+      button { font: inherit; padding: 6px 14px; margin-right: 8px; }
+      #status { margin-top: 16px; white-space: pre-wrap; }
+      ul { color: #444; }
+    </style>
+  </head>
+  <body>
+    <h1>OPFS Viewer — test fixture</h1>
+    <p>Seeds OPFS for this origin with data that exercises every viewer branch.
+      Serve over <code>http://localhost</code> (OPFS needs a secure context):</p>
+    <pre>python3 -m http.server 8000   # then open http://localhost:8000/test/fixture.html</pre>
+    <p>
+      <button id="seed" type="button">Seed</button>
+      <button id="clear" type="button">Clear OPFS</button>
+    </p>
+    <ul>
+      <li><code>config.json</code> — JSON (pretty-printed in preview)</li>
+      <li><code>logs/app.log</code> — text</li>
+      <li><code>assets/img/pixel.bin</code> — binary (has NUL → "Binary" branch)</li>
+      <li><code>big.bin</code> — 6 MB (over inline cap → "too large" branch)</li>
+      <li><code>empty-folder/</code> — empty directory</li>
+      <li><code>deep/…/very-long-name….txt</code> — long name (tooltip / truncation)</li>
+      <li><code>locked.bin</code> — held open by a worker (locked → ⚠ in tree)</li>
+    </ul>
+    <div id="status"></div>
+
+    <script>
+      const statusEl = document.getElementById("status");
+      const seedBtn = document.getElementById("seed");
+      const clearBtn = document.getElementById("clear");
+      let lockWorker = null;
+
+      const LONG_DIR = "very-long-directory-name-for-layout-testing";
+      const LONG_FILE = "this-is-an-extremely-long-file-name-used-to-test-tooltip-and-truncation.txt";
+
+      const setStatus = (text) => { statusEl.textContent = text; };
+
+      async function writeFile(dir, name, data) {
+        const fh = await dir.getFileHandle(name, { create: true });
+        const w = await fh.createWritable();
+        await w.write(data);
+        await w.close();
+      }
+
+      async function seed() {
+        seedBtn.disabled = true;
+        clearBtn.disabled = true;
+        try {
+          const root = await navigator.storage.getDirectory();
+
+          await writeFile(root, "config.json",
+            JSON.stringify({ name: "demo", version: 1, nested: { a: [1, 2, 3], ok: true } }));
+
+          const logs = await root.getDirectoryHandle("logs", { create: true });
+          await writeFile(logs, "app.log", "started\nrequest ok\nshutting down\n");
+
+          const img = await (await root.getDirectoryHandle("assets", { create: true }))
+            .getDirectoryHandle("img", { create: true });
+          await writeFile(img, "pixel.bin", new Uint8Array([0, 1, 2, 0, 255, 16, 0, 9]));
+
+          await writeFile(root, "big.bin", new Uint8Array(6 * 1024 * 1024));
+
+          await root.getDirectoryHandle("empty-folder", { create: true });
+
+          const deep = await (await root.getDirectoryHandle("deep", { create: true }))
+            .getDirectoryHandle(LONG_DIR, { create: true });
+          await writeFile(deep, LONG_FILE, "long-name file body\n");
+
+          await lockFile();
+
+          setStatus("Seeded. Open DevTools → OPFS panel → it should auto-read on focus.");
+        } catch (e) {
+          setStatus("Seed failed: " + e);
+        } finally {
+          seedBtn.disabled = false;
+          clearBtn.disabled = false;
+        }
+      }
+
+      // createSyncAccessHandle is worker-only; the worker keeps the handle open
+      // so the file stays exclusively locked while the panel reads the tree.
+      function lockFile() {
+        return new Promise((resolve) => {
+          const src = `
+            self.onmessage = async () => {
+              try {
+                const root = await navigator.storage.getDirectory();
+                const fh = await root.getFileHandle('locked.bin', { create: true });
+                const h = await fh.createSyncAccessHandle();
+                h.write(new Uint8Array([0, 1, 2, 3, 4]));
+                h.flush();
+                self.postMessage({ ok: true });
+              } catch (e) {
+                self.postMessage({ ok: false, error: String(e) });
+              }
+            };`;
+          if (lockWorker) lockWorker.terminate();
+          lockWorker = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+          lockWorker.onmessage = () => resolve();
+          lockWorker.postMessage("go");
+        });
+      }
+
+      async function clearAll() {
+        seedBtn.disabled = true;
+        clearBtn.disabled = true;
+        try {
+          if (lockWorker) { lockWorker.terminate(); lockWorker = null; }
+          const root = await navigator.storage.getDirectory();
+          const names = [];
+          for await (const name of root.keys()) names.push(name);
+          for (let i = 0; i < names.length; i++) {
+            await root.removeEntry(names[i], { recursive: true });
+          }
+          setStatus("Cleared " + names.length + " top-level entries.");
+        } catch (e) {
+          setStatus("Clear failed: " + e);
+        } finally {
+          seedBtn.disabled = false;
+          clearBtn.disabled = false;
+        }
+      }
+
+      seedBtn.addEventListener("click", seed);
+      clearBtn.addEventListener("click", clearAll);
+    </script>
+  </body>
+</html>

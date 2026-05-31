@@ -1,0 +1,137 @@
+:root {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  font: 12px/1.4 system-ui, sans-serif;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.3);
+}
+
+.status {
+  opacity: 0.7;
+}
+
+.status.error,
+.err {
+  color: #c0392b;
+}
+
+.split {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.tree {
+  width: 45%;
+  min-width: 200px;
+  overflow: auto;
+  padding: 2px 0;
+  border-right: 1px solid rgba(128, 128, 128, 0.3);
+  user-select: none;
+}
+
+.viewer {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: max-content;
+  min-width: 100%;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.row.file {
+  cursor: pointer;
+}
+
+.row:hover {
+  background: rgba(128, 128, 128, 0.15);
+}
+
+.row.selected {
+  background: rgba(128, 128, 128, 0.3);
+}
+
+.twisty {
+  width: 12px;
+  text-align: center;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+.name {
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  margin-left: 6px;
+  opacity: 0.6;
+}
+
+.err {
+  margin-left: 6px;
+}
+
+.empty,
+.notice,
+.viewer-empty {
+  padding: 12px;
+  opacity: 0.7;
+}
+
+.viewer-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.3);
+}
+
+.viewer-head .title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.viewer-head .sub {
+  opacity: 0.6;
+}
+
+.viewer-head button {
+  margin-left: auto;
+}
+
+.viewer pre {
+  margin: 0;
+  padding: 10px;
+  white-space: pre;
+  font-family: monospace;
+}
